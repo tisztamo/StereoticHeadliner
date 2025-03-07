@@ -13,20 +13,20 @@ async function main() {
     debugLogs += '[DEBUG] Fetched stats data, length: ' + statsData.length + '\n';
     statsData = statsData.map(stripUnwantedFields);
 
-    // Top 15 by Rank and 4h Change
-    const top15ByRank = [...statsData].sort((a, b) => a.rank - b.rank).slice(0, 15);
-    const top15ByChange4h = [...statsData].sort((a, b) => b.change4h - a.change4h).slice(0, 15);
+    // Top 7 by Rank and 4h Change
+    const topByRank = [...statsData].sort((a, b) => a.rank - b.rank).slice(0, 7);
+    const topByChange4h = [...statsData].sort((a, b) => b.change4h - a.change4h).slice(0, 7);
 
-    const top15ByRankSymbols = top15ByRank.map(item => item.symbolname.toUpperCase());
-    const top15ByChange4hSymbols = top15ByChange4h.map(item => item.symbolname.toUpperCase());
-    const relevantSymbols = new Set([...top15ByRankSymbols, ...top15ByChange4hSymbols]);
-    debugLogs += '[DEBUG] Top15 Rank: ' + top15ByRankSymbols.join(', ') + '\n';
-    debugLogs += '[DEBUG] Top15 Change: ' + top15ByChange4hSymbols.join(', ') + '\n';
+    const topByRankSymbols = topByRank.map(item => item.symbolname.toUpperCase());
+    const topByChange4hSymbols = topByChange4h.map(item => item.symbolname.toUpperCase());
+    const relevantSymbols = new Set([...topByRankSymbols, ...topByChange4hSymbols]);
+    debugLogs += '[INFO] Top by Rank: ' + topByRankSymbols.join(', ') + '\n';
+    debugLogs += '[INFO] Top by 4h Change: ' + topByChange4hSymbols.join(', ') + '\n';
 
-    const promptStatsSnippet = "Top 15 by Rank:\n" +
-      JSON.stringify(top15ByRank, null, 2) +
-      "\n\nTop 15 by 4h Change:\n" +
-      JSON.stringify(top15ByChange4h, null, 2);
+    const promptStatsSnippet = "Top by Rank:\n" +
+      JSON.stringify(topByRank, null, 2) +
+      "\n\nTop by 4h Change:\n" +
+      JSON.stringify(topByChange4h, null, 2);
 
     let newsData = await fetchNews();
     debugLogs += '[DEBUG] Fetched news data, length: ' + newsData.length + '\n';
@@ -44,9 +44,9 @@ async function main() {
     const llmOutput = await generateLLMSummary(promptStatsSnippet, promptNewsSnippet);
 
     // Assume LLM output structure: hook on first line, analysis in between, summary on last line
-    const lines = llmOutput.split('\n').filter(line => line.trim() !== '');
+    const lines = llmOutput.split('\n')
     const hook = lines[0] || 'Crypto Market Update';
-    const analysis = lines.slice(1, -1).join(' ') || 'Detailed analysis not provided.';
+    const analysis = "<p>" + lines.slice(1, -1).join('</p><p>') + "</p>" || 'Detailed analysis not provided.';
     const summary = lines[lines.length - 1] || 'Summary not provided.';
     debugLogs += '[DEBUG] LLM output received.\n';
 

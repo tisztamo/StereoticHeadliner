@@ -10,7 +10,7 @@ async function main() {
     debugLogs += '[DEBUG] Starting script...\n';
 
     let statsData = await fetchStats();
-    debugLogs += \`[DEBUG] Fetched stats data, length: \${statsData.length}\n\`;
+    debugLogs += '[DEBUG] Fetched stats data, length: ' + statsData.length + '\n';
     statsData = statsData.map(stripUnwantedFields);
 
     // Top 15 by Rank and 4h Change
@@ -20,27 +20,24 @@ async function main() {
     const top15ByRankSymbols = top15ByRank.map(item => item.symbolname.toUpperCase());
     const top15ByChange4hSymbols = top15ByChange4h.map(item => item.symbolname.toUpperCase());
     const relevantSymbols = new Set([...top15ByRankSymbols, ...top15ByChange4hSymbols]);
-    debugLogs += \`[DEBUG] Top15 Rank: \${top15ByRankSymbols.join(', ')}\n\`;
-    debugLogs += \`[DEBUG] Top15 Change: \${top15ByChange4hSymbols.join(', ')}\n\`;
+    debugLogs += '[DEBUG] Top15 Rank: ' + top15ByRankSymbols.join(', ') + '\n';
+    debugLogs += '[DEBUG] Top15 Change: ' + top15ByChange4hSymbols.join(', ') + '\n';
 
-    const promptStatsSnippet = \`
-Top 15 by Rank:
-\${JSON.stringify(top15ByRank, null, 2)}
-
-Top 15 by 4h Change:
-\${JSON.stringify(top15ByChange4h, null, 2)}
-\`;
+    const promptStatsSnippet = "Top 15 by Rank:\n" +
+      JSON.stringify(top15ByRank, null, 2) +
+      "\n\nTop 15 by 4h Change:\n" +
+      JSON.stringify(top15ByChange4h, null, 2);
 
     let newsData = await fetchNews();
-    debugLogs += \`[DEBUG] Fetched news data, length: \${newsData.length}\n\`;
+    debugLogs += '[DEBUG] Fetched news data, length: ' + newsData.length + '\n';
     const filteredNews = newsData.filter(article => {
       if (!article.tickers || !Array.isArray(article.tickers)) return false;
       return article.tickers.some(ticker => relevantSymbols.has(ticker.toUpperCase()));
     });
-    debugLogs += \`[DEBUG] Filtered news count: \${filteredNews.length}\n\`;
+    debugLogs += '[DEBUG] Filtered news count: ' + filteredNews.length + '\n';
 
     const promptNewsSnippet = filteredNews
-      .map((item, idx) => \`\${idx + 1}. Title: "\${item.title}"\n   Headline: "\${item.headline}"\`)
+      .map((item, idx) => (idx + 1) + '. Title: "' + item.title + '"\n   Headline: "' + item.headline + '"')
       .join('\n');
 
     debugLogs += '[DEBUG] Requesting summary from LLM...\n';
@@ -54,7 +51,7 @@ Top 15 by 4h Change:
     debugLogs += '[DEBUG] LLM output received.\n';
 
     const fileName = generateHTMLReport({ hook, analysis, summary, debugLogs });
-    console.log(\`Report generated: \${fileName}\`);
+    console.log('Report generated: ' + fileName);
   } catch (err) {
     console.error('[ERROR]', err);
   }

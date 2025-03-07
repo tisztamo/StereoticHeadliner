@@ -69,7 +69,13 @@ Change 7d: ${coin.change7d.toFixed(3)}%
     const analysis = paragraphs.slice(2).join('\n\n') || 'Detailed analysis not provided.';
     debugLogs += '[DEBUG] LLM output received and parsed.\n';
 
-    const fileName = generateHTMLReport({ hook, analysis, summary, debugLogs });
+    const fileName = generateHTMLReport({ 
+      hook, 
+      analysis, 
+      summary, 
+      debugLogs,
+      statsData: promptStatsSnippet  // Pass the stats data to the report generator
+    });
     console.log('Report generated: ' + fileName);
   } catch (err) {
     console.error('[ERROR]', err);

@@ -7,7 +7,7 @@ fail_count=0
 # Loop until there are 10 consecutive failures
 while [ $fail_count -lt 10 ]; do
   # Run the command
-  bun run headliner.js
+  time bun run headliner.js
   exit_code=$?
 
   if [ $exit_code -eq 0 ]; then

@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { fetchStats, fetchNews } = require('./lib/fetchData');
-const { generateLLMSummary } = require('./lib/openai');
+const { generateLLMSummary } = require('./lib/marketSummary');
 const { generateHTMLReport } = require('./lib/generateReport');
 const { stripUnwantedFields } = require('./lib/utils');
 

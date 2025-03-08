@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Initialize failure counter
+RUN_INTERVAL=14400
 fail_count=0
+
 
 # Loop until there are 10 consecutive failures
 while [ $fail_count -lt 10 ]; do
@@ -12,8 +13,8 @@ while [ $fail_count -lt 10 ]; do
   if [ $exit_code -eq 0 ]; then
     # Reset failure counter on success
     fail_count=0
-    echo "Command succeeded. Waiting 60 minutes before next run."
-    sleep 3600  # Sleep for 60 minutes (3600 seconds)
+    echo "Command succeeded. Waiting ${RUN_INTERVAL} seconds before next run."
+    sleep ${RUN_INTERVAL}
   else
     # Increment failure counter on error
     ((fail_count++))

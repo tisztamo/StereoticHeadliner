@@ -1,2 +1,6 @@
 ./reports/
 *.html
+*.exe
+video/output/
+node_modules/
+data/

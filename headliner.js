@@ -1,13 +1,19 @@
-require('dotenv').config();
-const { fetchStats, fetchNews } = require('./lib/fetchData');
-const { generateLLMSummary } = require('./lib/marketSummary');
-const { generateHTMLReport } = require('./lib/generateReport');
-const { stripUnwantedFields } = require('./lib/utils');
+import { fetchStats, fetchNews } from './lib/fetchData.js';
+import { generateLLMSummary } from './lib/marketSummary.js';
+import { generateHTMLReport } from './lib/generateReport.js';
+import { stripUnwantedFields } from './lib/utils.js';
+import { processVideo } from './video/videoProcessor.js';
 
 async function main() {
   let debugLogs = '';
   try {
     debugLogs += '[DEBUG] Starting script...\n';
+
+    // Check if the --video flag is provided
+    const generateVideo = process.argv.includes('--video');
+    if (generateVideo) {
+      debugLogs += '[DEBUG] Video generation is enabled\n';
+    }
 
     let statsData = await fetchStats();
     debugLogs += '[DEBUG] Fetched stats data, length: ' + statsData.length + '\n';
@@ -28,9 +34,10 @@ async function main() {
     debugLogs += '[INFO] Top Rank: ' + top7ByRankSymbols.join(', ') + '\n';
     debugLogs += '[INFO] Top Change: ' + top7ByChange4hSymbols.join(', ') + '\n';
 
-    const promptStatsSnippet = "Top 7 by Rank:\n" +
+    const promptStatsSnippet = "Top by Rank:\n" +
       top7ByRank.map(coin => 
-        `Name: ${coin.symbolname ? coin.symbolname.toUpperCase() : 'N/A'}
+        `Name: ${coin.name ? coin.name : 'N/A'}
+TICKER: ${coin.symbolname ? coin.symbolname.toUpperCase() : 'N/A'}
 Rank: ${coin.rank || 'N/A'}
 Price: $${coin.price || 'N/A'}
 Change 1h: ${coin.change1h != null ? coin.change1h.toFixed(3) : 'N/A'}%
@@ -38,9 +45,10 @@ Change 4h: ${coin.change4h != null ? coin.change4h.toFixed(3) : 'N/A'}%
 Change 24h: ${coin.change24h != null ? coin.change24h.toFixed(3) : 'N/A'}%
 Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(3) : 'N/A'}%
 `).join('\n') +
-      "\n\nTop 7 by 4h Change:\n" +
+      "\n\nTop by 4h Change:\n" +
       top7ByChange4h.map(coin => 
-        `Name: ${coin.symbolname ? coin.symbolname.toUpperCase() : 'N/A'}
+        `Name: ${coin.name ? coin.name : 'N/A'}
+TICKER: ${coin.symbolname ? coin.symbolname.toUpperCase() : 'N/A'}
 Rank: ${coin.rank || 'N/A'}
 Price: $${coin.price || 'N/A'}
 Change 1h: ${coin.change1h != null ? coin.change1h.toFixed(3) : 'N/A'}%
@@ -84,6 +92,19 @@ Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(3) : 'N/A'}%
       statsData: promptStatsSnippet  // Pass the stats data to the report generator
     });
     console.log('Report generated: ' + fileName);
+
+    // Generate video if --video flag is provided
+    if (generateVideo) {
+      debugLogs += '[DEBUG] Starting video generation process...\n';
+      try {
+        // Use the hook (headline) as the text for the video
+        const videoPath = await processVideo(`${hook}.\n\n${summary}\nVisit stereotic.com for more!`);
+        console.log(`Video generated successfully: ${videoPath}`);
+      } catch (videoError) {
+        console.error('[ERROR] Video generation failed:', videoError);
+        debugLogs += `[ERROR] Video generation failed: ${videoError.message}\n`;
+      }
+    }
   } catch (err) {
     console.error('[ERROR]', err);
   }

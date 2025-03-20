@@ -40,10 +40,10 @@ async function main() {
 TICKER: ${coin.symbolname ? coin.symbolname.toUpperCase() : 'N/A'}
 Rank: ${coin.rank || 'N/A'}
 Price: $${coin.price || 'N/A'}
-Change 1h: ${coin.change1h != null ? coin.change1h.toFixed(3) : 'N/A'}%
-Change 4h: ${coin.change4h != null ? coin.change4h.toFixed(3) : 'N/A'}%
-Change 24h: ${coin.change24h != null ? coin.change24h.toFixed(3) : 'N/A'}%
-Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(3) : 'N/A'}%
+Change 1h: ${coin.change1h != null ? coin.change1h.toFixed(1) : 'N/A'}%
+Change 4h: ${coin.change4h != null ? coin.change4h.toFixed(1) : 'N/A'}%
+Change 24h: ${coin.change24h != null ? coin.change24h.toFixed(1) : 'N/A'}%
+Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(1) : 'N/A'}%
 `).join('\n') +
       "\n\nTop by 4h Change:\n" +
       top7ByChange4h.map(coin => 
@@ -51,10 +51,10 @@ Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(3) : 'N/A'}%
 TICKER: ${coin.symbolname ? coin.symbolname.toUpperCase() : 'N/A'}
 Rank: ${coin.rank || 'N/A'}
 Price: $${coin.price || 'N/A'}
-Change 1h: ${coin.change1h != null ? coin.change1h.toFixed(3) : 'N/A'}%
-Change 4h: ${coin.change4h != null ? coin.change4h.toFixed(3) : 'N/A'}%
-Change 24h: ${coin.change24h != null ? coin.change24h.toFixed(3) : 'N/A'}%
-Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(3) : 'N/A'}%
+Change 1h: ${coin.change1h != null ? coin.change1h.toFixed(1) : 'N/A'}%
+Change 4h: ${coin.change4h != null ? coin.change4h.toFixed(1) : 'N/A'}%
+Change 24h: ${coin.change24h != null ? coin.change24h.toFixed(1) : 'N/A'}%
+Change 7d: ${coin.change7d != null ? coin.change7d.toFixed(1) : 'N/A'}%
 `).join('\n');
 
     let newsData = await fetchNews();

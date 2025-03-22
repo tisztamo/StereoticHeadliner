@@ -4,3 +4,4 @@
 video/output/
 node_modules/
 data/
+last_llm_output.json

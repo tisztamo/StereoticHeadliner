@@ -5,3 +5,5 @@ video/output/
 node_modules/
 data/
 last_llm_output.json
+last_report.json
+last_report.html

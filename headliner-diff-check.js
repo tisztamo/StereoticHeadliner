@@ -10,9 +10,10 @@ import { callLLM } from './lib/openrouter.js';
 import { config as appConfig } from './config.js';
 
 // Configuration
-const DIFF_THRESHOLD = 0.65; // Threshold for considering headlines significantly different (0-1)
+const DIFF_THRESHOLD = 0.7; // Threshold for considering headlines significantly different (0-1)
 const STATS_CHANGE_THRESHOLD = 1.0; // Threshold for considering stats significantly different (percentage)
 const STORAGE_PATH = path.join(process.cwd(), 'last_llm_output.json');
+const LAST_REPORT_PATH = path.join(process.cwd(), 'last_report.json');
 
 // Cooldown tracking
 let lastReportTime = null;
@@ -106,28 +107,50 @@ Return only a number between 0 and 1.`
   return isNaN(differenceValue) ? 0.5 : differenceValue;
 }
 
-async function saveData(output, statsData, newsData) {
+async function saveData(output, statsData, newsData, isReport = false) {
+  // Always save the last LLM output
   fs.writeFileSync(STORAGE_PATH, JSON.stringify({
     timestamp: new Date().toISOString(),
     content: output,
     stats: statsData,
     news: newsData
   }), 'utf8');
+  
+  // If this is a report, also save it as the last report
+  if (isReport) {
+    fs.writeFileSync(LAST_REPORT_PATH, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      content: output
+    }), 'utf8');
+  }
 }
 
 async function loadPreviousData() {
-  if (!fs.existsSync(STORAGE_PATH)) return { content: null, stats: null, news: null };
-  try {
-    const data = JSON.parse(fs.readFileSync(STORAGE_PATH, 'utf8'));
-    return {
-      content: data.content,
-      stats: data.stats || null,
-      news: data.news || null
-    };
-  } catch (err) {
-    console.error('[ERROR] Failed to read previous data:', err);
-    return { content: null, stats: null, news: null };
+  const result = { content: null, stats: null, news: null, reportContent: null };
+  
+  // Try to load last LLM output
+  if (fs.existsSync(STORAGE_PATH)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(STORAGE_PATH, 'utf8'));
+      result.content = data.content;
+      result.stats = data.stats || null;
+      result.news = data.news || null;
+    } catch (err) {
+      console.error('[ERROR] Failed to read previous data:', err);
+    }
   }
+  
+  // Try to load last report
+  if (fs.existsSync(LAST_REPORT_PATH)) {
+    try {
+      const reportData = JSON.parse(fs.readFileSync(LAST_REPORT_PATH, 'utf8'));
+      result.reportContent = reportData.content;
+    } catch (err) {
+      console.error('[ERROR] Failed to read last report data:', err);
+    }
+  }
+  
+  return result;
 }
 
 async function generateHeadlines() {
@@ -142,7 +165,7 @@ async function generateHeadlines() {
       
       if (timeSinceLastReport < cooldownTimeMs) {
         const remainingMinutes = Math.ceil((cooldownTimeMs - timeSinceLastReport) / (60 * 1000));
-        console.log(`[${new Date().toISOString()}] In cooldown period after last report. ${remainingMinutes} minutes remaining.`);
+        console.log(`\x1b[33m[${new Date().toISOString()}] In cooldown period after last report. ${remainingMinutes} minutes remaining.\x1b[0m`);
         return;
       }
     }
@@ -164,7 +187,10 @@ async function generateHeadlines() {
     );
 
     // Load previous data for comparison
-    const { content: previousOutput, stats: previousStats, news: previousNews } = await loadPreviousData();
+    const { content: previousOutput, stats: previousStats, news: previousNews, reportContent: lastReportContent } = await loadPreviousData();
+    
+    // Determine which content to compare against (prefer last report if available)
+    const baselineContent = lastReportContent || previousOutput;
     
     // Check if data has changed significantly
     const newsIdentical = areNewsItemsIdentical(previousNews, news.filtered);
@@ -183,9 +209,9 @@ async function generateHeadlines() {
       titleSummaryOutput = await generateTitleSummary(stats.prompt, news.prompt);
       
       // Calculate difference between outputs if we have previous output
-      if (previousOutput) {
-        difference = await calculateDifference(previousOutput, titleSummaryOutput);
-        debugLogs += `[INFO] Difference score between current and previous output: ${difference}\n`;
+      if (baselineContent) {
+        difference = await calculateDifference(baselineContent, titleSummaryOutput);
+        debugLogs += `[INFO] Difference score between current and last report: ${difference}\n`;
       } else {
         difference = 1.0; // No previous output, consider as completely different
       }
@@ -225,15 +251,18 @@ async function generateHeadlines() {
         debugLogs,
         statsData: stats.prompt
       });
-      console.log(`[${new Date().toISOString()}] Report generated: ${fileName}`);
+      console.log(`\x1b[33m[${new Date().toISOString()}] Report generated: ${fileName}\x1b[0m`);
+      
+      // Mark this as a report for storage
+      await saveData(fullOutput, statsData, news.filtered, true);
       
       // Set cooldown timer after generating a report
       lastReportTime = Date.now();
     } else {
       if (alwaysRun || !newsIdentical || statsChanged) {
-        console.log(`[${new Date().toISOString()}] Data changed but not enough for a new report (diff score: ${difference}). Skipping report generation.`);
+        console.log(`\x1b[33m[${new Date().toISOString()}] Data changed but not enough for a new report (diff score: ${difference}). Skipping report generation.\x1b[0m`);
       } else {
-        console.log(`[${new Date().toISOString()}] No significant data changes. Skipping LLM call and report generation.`);
+        console.log(`\x1b[33m[${new Date().toISOString()}] No significant data changes. Skipping LLM call and report generation.\x1b[0m`);
       }
     }
   } catch (err) {
@@ -246,4 +275,4 @@ generateHeadlines();
 
 // Schedule runs at regular intervals
 setInterval(generateHeadlines, appConfig.CHECK_INTERVAL_MINUTES * 60 * 1000);
-console.log(`Headliner started. Running every ${appConfig.CHECK_INTERVAL_MINUTES} minutes. Cooldown after report: ${appConfig.COOLDOWN_MINUTES} minutes.`); 
+console.log(`\x1b[33mHeadliner started. Running every ${appConfig.CHECK_INTERVAL_MINUTES} minutes. Cooldown after report: ${appConfig.COOLDOWN_MINUTES} minutes.\x1b[0m`); 

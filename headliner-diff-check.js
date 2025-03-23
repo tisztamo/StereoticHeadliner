@@ -10,10 +10,11 @@ import { callLLM } from './lib/openrouter.js';
 import { config as appConfig } from './config.js';
 
 // Configuration
-const DIFF_THRESHOLD = 0.7; // Threshold for considering headlines significantly different (0-1)
+const DIFF_THRESHOLD = 0.55; // Threshold for considering headlines significantly different (0-1)
 const STATS_CHANGE_THRESHOLD = 1.0; // Threshold for considering stats significantly different (percentage)
-const STORAGE_PATH = path.join(process.cwd(), 'last_llm_output.json');
+
 const LAST_REPORT_PATH = path.join(process.cwd(), 'last_report.json');
+const LLM_LOG_PATH = path.join(process.cwd(), 'llm_output_logs.txt');
 
 // Cooldown tracking
 let lastReportTime = null;
@@ -62,20 +63,20 @@ function haveStatsChangedSignificantly(previousStats, currentStats) {
   return false;
 }
 
-async function calculateDifference(previousOutput, currentOutput) {
-  if (!previousOutput) return 1.0; // If no previous output, consider as completely different
+// Function to append LLM output to log file
+function logLLMOutput(output) {
+  const timestamp = new Date().toISOString();
+  const logEntry = `\n\n[${timestamp}]\n${output}\n${'='.repeat(80)}`;
   
-  // Parse according to the format scheme to extract titles
-  const previousParagraphs = previousOutput.split('\n\n').filter(p => p.trim());
-  const currentParagraphs = currentOutput.split('\n\n').filter(p => p.trim());
+  fs.appendFileSync(LLM_LOG_PATH, logEntry, 'utf8');
+}
+
+async function calculateDifference(previousTitleSummary, currentTitleSummary) {
+  console.log("\x1b[0mCalculating difference between:\x1b[33m\n", previousTitleSummary, "\x1b[0\nmand\x1b[33m\n", currentTitleSummary, "[0m");
+  if (!previousTitleSummary) return 1.0; // If no previous output, consider as completely different
   
-  const previousTitle = previousParagraphs[0]?.trim() || '';
-  const previousHeadline = previousParagraphs[1]?.trim() || '';
-  const currentTitle = currentParagraphs[0]?.trim() || '';
-  const currentHeadline = currentParagraphs[1]?.trim() || '';
-  
-  // If titles are identical, check for minimal difference
-  if (previousTitle === currentTitle && previousHeadline === currentHeadline) return 0.0;
+  // If titles are identical, consider them the same
+  if (previousTitleSummary === currentTitleSummary) return 0.0;
   
   // Use LLM to evaluate title difference
   const messages = [
@@ -88,12 +89,10 @@ async function calculateDifference(previousOutput, currentOutput) {
       content: `Evaluate how different these two crypto market headlines are semantically on a scale from 0 to 1:
       
 Headline 1:
-${previousTitle}
-${previousHeadline}
+${previousTitleSummary}
 
 Headline 2:
-${currentTitle}
-${currentHeadline}
+${currentTitleSummary}
 
 Return only a number between 0 and 1.`
     }
@@ -107,44 +106,31 @@ Return only a number between 0 and 1.`
   return isNaN(differenceValue) ? 0.5 : differenceValue;
 }
 
-async function saveData(output, statsData, newsData, isReport = false) {
-  // Always save the last LLM output
-  fs.writeFileSync(STORAGE_PATH, JSON.stringify({
+async function saveData(output, statsData, newsData, titleSummary = null) {
+  // Log the LLM output to the log file
+  logLLMOutput(output);
+  
+  // Save data to the last report file
+  fs.writeFileSync(LAST_REPORT_PATH, JSON.stringify({
     timestamp: new Date().toISOString(),
     content: output,
+    titleSummary: titleSummary || output, // If no separate title summary provided, use the full content
     stats: statsData,
     news: newsData
   }), 'utf8');
-  
-  // If this is a report, also save it as the last report
-  if (isReport) {
-    fs.writeFileSync(LAST_REPORT_PATH, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      content: output
-    }), 'utf8');
-  }
 }
 
 async function loadPreviousData() {
-  const result = { content: null, stats: null, news: null, reportContent: null };
+  const result = { stats: null, news: null, reportContent: null, titleSummary: null };
   
-  // Try to load last LLM output
-  if (fs.existsSync(STORAGE_PATH)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(STORAGE_PATH, 'utf8'));
-      result.content = data.content;
-      result.stats = data.stats || null;
-      result.news = data.news || null;
-    } catch (err) {
-      console.error('[ERROR] Failed to read previous data:', err);
-    }
-  }
-  
-  // Try to load last report
+  // Try to load last report data
   if (fs.existsSync(LAST_REPORT_PATH)) {
     try {
       const reportData = JSON.parse(fs.readFileSync(LAST_REPORT_PATH, 'utf8'));
+      result.stats = reportData.stats || null;
+      result.news = reportData.news || null;
       result.reportContent = reportData.content;
+      result.titleSummary = reportData.titleSummary || reportData.content;
     } catch (err) {
       console.error('[ERROR] Failed to read last report data:', err);
     }
@@ -187,10 +173,7 @@ async function generateHeadlines() {
     );
 
     // Load previous data for comparison
-    const { content: previousOutput, stats: previousStats, news: previousNews, reportContent: lastReportContent } = await loadPreviousData();
-    
-    // Determine which content to compare against (prefer last report if available)
-    const baselineContent = lastReportContent || previousOutput;
+    const { stats: previousStats, news: previousNews, titleSummary: lastTitleSummary } = await loadPreviousData();
     
     // Check if data has changed significantly
     const newsIdentical = areNewsItemsIdentical(previousNews, news.filtered);
@@ -209,9 +192,9 @@ async function generateHeadlines() {
       titleSummaryOutput = await generateTitleSummary(stats.prompt, news.prompt);
       
       // Calculate difference between outputs if we have previous output
-      if (baselineContent) {
-        difference = await calculateDifference(baselineContent, titleSummaryOutput);
-        debugLogs += `[INFO] Difference score between current and last report: ${difference}\n`;
+      if (lastTitleSummary) {
+        difference = await calculateDifference(lastTitleSummary, titleSummaryOutput);
+        debugLogs += `[INFO] Difference score between current and last title summary: ${difference}\n`;
       } else {
         difference = 1.0; // No previous output, consider as completely different
       }
@@ -219,19 +202,17 @@ async function generateHeadlines() {
       // Only proceed to generate full report if difference is significant
       if (difference >= DIFF_THRESHOLD) {
         debugLogs += '[INFO] Significant difference detected. Generating full market analysis...\n';
-        fullOutput = await generateLLMSummary(stats.prompt, news.prompt);
+        fullOutput = await generateLLMSummary(stats.prompt, news.prompt, titleSummaryOutput);
         
         // Save current data with full output for future comparisons
-        await saveData(fullOutput, statsData, news.filtered);
+        await saveData(fullOutput, statsData, news.filtered, titleSummaryOutput);
       } else {
         debugLogs += '[INFO] No significant difference detected. Skipping full LLM generation.\n';
         // Save current data with title+summary output for future comparisons
-        await saveData(titleSummaryOutput, statsData, news.filtered);
+        await saveData(titleSummaryOutput, statsData, news.filtered, titleSummaryOutput);
       }
     } else {
       debugLogs += '[INFO] No significant data changes detected. Skipping LLM call.\n';
-      // If we reuse the previous output, make sure we save the current stats and news
-      await saveData(previousOutput, statsData, news.filtered);
     }
     
     // Only generate report if difference is significant and we have full output
@@ -253,8 +234,8 @@ async function generateHeadlines() {
       });
       console.log(`\x1b[33m[${new Date().toISOString()}] Report generated: ${fileName}\x1b[0m`);
       
-      // Mark this as a report for storage
-      await saveData(fullOutput, statsData, news.filtered, true);
+      // Mark this as a report for storage, passing both full output and title summary
+      await saveData(fullOutput, statsData, news.filtered, titleSummaryOutput);
       
       // Set cooldown timer after generating a report
       lastReportTime = Date.now();

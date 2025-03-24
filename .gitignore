@@ -8,3 +8,4 @@ last_llm_output.json
 last_report.json
 last_report.html
 llm_output_logs.txt
+.env

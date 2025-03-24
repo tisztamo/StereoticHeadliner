@@ -31,7 +31,9 @@ You can also set these in a `.env` file.
 
 ## Email Notifications
 
-The system can automatically send email notifications when new reports are generated:
+The system can automatically send email notifications when new reports are generated using either Gmail (via nodemailer) or MailerLite. You can configure one or both methods:
+
+### Gmail Configuration (via nodemailer)
 
 1. Copy the `.env.template` file to `.env` and configure the email settings:
    - `SOURCE_EMAIL`: Your Gmail address
@@ -42,6 +44,15 @@ The system can automatically send email notifications when new reports are gener
    - Go to your Google Account > Security > 2-Step Verification
    - Scroll down to "App passwords" 
    - Generate a new app password for "Mail" and your device
+
+### MailerLite Configuration
+
+To use MailerLite for sending reports, add the following environment variables to your `.env` file:
+
+- `MAILERLITE_API_KEY`: Your MailerLite API key
+- `MAILERLITE_GROUP_ID`: The ID of the MailerLite group to send to
+- `MAILERLITE_FROM_EMAIL`: The email address to send from
+- `MAILERLITE_FROM_NAME`: The name to display as the sender
 
 The HTML report will be sent as the email body with the report title as the subject.
 

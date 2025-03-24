@@ -16,8 +16,14 @@ const STATS_CHANGE_THRESHOLD = 1.0; // Threshold for considering stats significa
 const LAST_REPORT_PATH = path.join(process.cwd(), 'last_report.json');
 const LLM_LOG_PATH = path.join(process.cwd(), 'llm_output_logs.txt');
 
+// Command line arguments
+const FORCE_REPORT = process.argv.includes('--force-report');
+const ALWAYS_RUN = process.argv.includes('--always-run');
+
 // Cooldown tracking
 let lastReportTime = null;
+// Track if first run has occurred (for --force-report)
+let isFirstRun = true;
 
 // Function to check if two arrays of news items are identical
 function areNewsItemsIdentical(previousNews, currentNews) {
@@ -183,10 +189,12 @@ async function generateHeadlines() {
     let fullOutput = null;
     let difference = 0;
     
-    // Only make an LLM call if there are significant changes in the data
-    const alwaysRun = process.argv.includes('--always-run');
-    if (alwaysRun || !newsIdentical || statsChanged) {
-      debugLogs += '[INFO] Significant data changes detected. First generating title and summary only...\n';
+    // Force generation on first run if --force-report is specified
+    const shouldForceReport = FORCE_REPORT && isFirstRun;
+    
+    // Only make an LLM call if there are significant changes in the data or force flags are set
+    if (ALWAYS_RUN || shouldForceReport || !newsIdentical || statsChanged) {
+      debugLogs += '[INFO] ' + (shouldForceReport ? 'Force report generation requested. ' : '') + 'Generating title and summary...\n';
       
       // First stage: Generate just the title and summary
       titleSummaryOutput = await generateTitleSummary(stats.prompt, news.prompt);
@@ -199,9 +207,9 @@ async function generateHeadlines() {
         difference = 1.0; // No previous output, consider as completely different
       }
       
-      // Only proceed to generate full report if difference is significant
-      if (difference >= DIFF_THRESHOLD) {
-        debugLogs += '[INFO] Significant difference detected. Generating full market analysis...\n';
+      // Only proceed to generate full report if difference is significant or force report is requested
+      if (difference >= DIFF_THRESHOLD || shouldForceReport) {
+        debugLogs += '[INFO] ' + (shouldForceReport ? 'Forced report generation. ' : 'Significant difference detected. ') + 'Generating full market analysis...\n';
         fullOutput = await generateLLMSummary(stats.prompt, news.prompt, titleSummaryOutput);
         
         // Save current data with full output for future comparisons
@@ -214,7 +222,7 @@ async function generateHeadlines() {
     }
     
     // Only generate report if difference is significant and we have full output
-    if (difference >= DIFF_THRESHOLD && fullOutput) {
+    if ((difference >= DIFF_THRESHOLD || shouldForceReport) && fullOutput) {
       debugLogs += '[INFO] Generating new HTML report.\n';
       
       // Parse according to the format scheme
@@ -235,12 +243,15 @@ async function generateHeadlines() {
       // Set cooldown timer after generating a report
       lastReportTime = Date.now();
     } else {
-      if (alwaysRun || !newsIdentical || statsChanged) {
+      if (ALWAYS_RUN || !newsIdentical || statsChanged) {
         console.log(`\x1b[33m[${new Date().toISOString()}] Data changed but not enough for a new report (diff score: ${difference}). Skipping report generation.\x1b[0m`);
       } else {
         console.log(`\x1b[33m[${new Date().toISOString()}] No significant data changes. Skipping LLM call and report generation.\x1b[0m`);
       }
     }
+    
+    // Mark first run as completed
+    isFirstRun = false;
   } catch (err) {
     console.error('[ERROR]', err);
   }

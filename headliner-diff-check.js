@@ -208,8 +208,6 @@ async function generateHeadlines() {
         await saveData(fullOutput, statsData, news.filtered, titleSummaryOutput);
       } else {
         debugLogs += '[INFO] No significant difference detected. Skipping full LLM generation.\n';
-        // Save current data with title+summary output for future comparisons
-        await saveData(titleSummaryOutput, statsData, news.filtered, titleSummaryOutput);
       }
     } else {
       debugLogs += '[INFO] No significant data changes detected. Skipping LLM call.\n';
@@ -233,9 +231,6 @@ async function generateHeadlines() {
         statsData: stats.prompt
       });
       console.log(`\x1b[33m[${new Date().toISOString()}] Report generated: ${fileName}\x1b[0m`);
-      
-      // Mark this as a report for storage, passing both full output and title summary
-      await saveData(fullOutput, statsData, news.filtered, titleSummaryOutput);
       
       // Set cooldown timer after generating a report
       lastReportTime = Date.now();
